@@ -81,7 +81,7 @@ class Player
     static Node GetNextNode(
         int y, 
         int x, 
-        string direction, 
+        ref string direction, 
         Graph graph,  
         IDictionary<Tuple<int, int>, IList<string>> savedDirections,
         Dictionary<Tuple<int, int>, string> markers,
@@ -110,10 +110,17 @@ class Player
             return null;
         
         var nextSdKey = new Tuple<int, int>(y, x);
-        if (savedDirections.ContainsKey(nextSdKey) && savedDirections[nextSdKey].Any(sd => sd == direction))
+        if (savedDirections.ContainsKey(nextSdKey))
         {
-            isCycle = true;
-            return null;
+            foreach (var d in savedDirections[nextSdKey])
+            {
+                if (d == direction)
+                {
+                    isCycle = true;
+                    return null;
+                }
+            }
+            
         }
         return graph.Grid[y][x];
     }
@@ -181,7 +188,7 @@ class Player
         Dictionary<Tuple<int, int>, string> markers)
     {
         bool isCycled;
-        var nextNode = GetNextNode(y, x, direction, graph, savedDirections, markers, out isCycled);
+        var nextNode = GetNextNode(y, x, ref direction, graph, savedDirections, markers, out isCycled);
         var currPath = new List<Node>();
 
         while (nextNode != null){
@@ -189,7 +196,7 @@ class Player
             var sdKey = new Tuple<int, int>(nextNode.Y, nextNode.X);
             if (!savedDirections.ContainsKey(sdKey)) savedDirections.Add(sdKey, new List<string>());
             savedDirections[sdKey].Add(direction);
-            nextNode = GetNextNode(nextNode.Y, nextNode.X, direction, graph, savedDirections, markers, out isCycled);
+            nextNode = GetNextNode(nextNode.Y, nextNode.X, ref direction, graph, savedDirections, markers, out isCycled);
         }
         if (currPath.Count == 0) return null;
         if (isCycled) return currPath;
