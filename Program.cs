@@ -398,9 +398,13 @@ class Player
         return pathes;
     }
 
+
+    private static int _counter = 0;
     static IList<PathMapContainer> GetAllPossiblePathes(Tuple<int, int> pos, char direction, char[][] grid, IList<Step> currPath)
     {
         if (grid[pos.Item1][pos.Item2] == '#') return null;
+        
+        _counter++;
       
         var res = new List<PathMapContainer>();
 
@@ -416,10 +420,19 @@ class Player
         }
         else
         {
-            foreach (var d in DIRECTIONS)
+            if (_counter > 10275)
             {
+                var d = DIRECTIONS[_rnd.Next(DIRECTIONS.Count)];
                 var odc = GetOneDirectionContainer(pos, grid, currPath, direction, d);
                 if (odc != null) res.AddRange(odc);
+            }
+            else
+            {
+                foreach (var d in DIRECTIONS)
+                {
+                    var odc = GetOneDirectionContainer(pos, grid, currPath, direction, d);
+                    if (odc != null) res.AddRange(odc);
+                }
             }
         }
         
@@ -461,37 +474,46 @@ class Player
         var splitedGris = GetSplitedGrids(grid, robots);
         foreach (var sg in splitedGris.Keys)
         {
-            
-            var startRobot = splitedGris[sg][0];
-            var apps = GetAllPossiblePathes(_tuples[startRobot.Y][startRobot.X], startRobot.Direction, sg, new List<Step>());
-            var sortedApps = apps.OrderBy(a => a.Path.Count).ToList();
-            var bestMap = sortedApps[0].Map;
-            
-            for (var i = 1; i < splitedGris[sg].Count; ++i)
+            _counter = 0;
+            PathMapContainer maxLengthApp = null;
+            var maxLength = -1;
+            for (var r = splitedGris[sg].Count - 1; r >= 0; --r)
             {
-                var currRobot = splitedGris[sg][i];
-                var currRobotApps = GetAllPossiblePathes(_tuples[currRobot.Y][currRobot.X], currRobot.Direction, bestMap, new List<Step>());
-                var maxLength = -1;
+                var startRobot = splitedGris[sg][r];
+                var apps = GetAllPossiblePathes(_tuples[startRobot.Y][startRobot.X], startRobot.Direction, sg, new List<Step>());
                 
-                foreach (var cra in currRobotApps)
+                foreach (var app in apps)
                 {
-                    if (cra.Path.Count > maxLength)
+                    var summPathLength = app.Path.Count;
+                    for (var i = 0; i < splitedGris[sg].Count; ++i)
                     {
-                        maxLength = cra.Path.Count;
-                        bestMap = cra.Map;
+                        if (i==r) continue;
+                        var currRobot = splitedGris[sg][i];
+                        var path = new Dictionary<Tuple<int, int>, IList<char>>();
+                        BuildPath(currRobot.Y, currRobot.X, currRobot.Direction, sg, path);
+                        var pathLength = GetPathCount(path);
+                        summPathLength += pathLength;
+                    }
+
+                    if (summPathLength > maxLength)
+                    {
+                        maxLength = summPathLength;
+                        maxLengthApp = app;
                     }
                 }
             }
             
-            if (bestMap == null) continue;
             
-            for (int i = 0; i < bestMap.Length; i++)
+            if (maxLengthApp == null) continue;
+            
+            var map = maxLengthApp.Map;
+            for (int i = 0; i < map.Length; i++)
             {
-                for (int j = 0; j < bestMap[i].Length; j++)
+                for (int j = 0; j < map[i].Length; j++)
                 {
-                    if (bestMap[i][j] != sg[i][j])
+                    if (map[i][j] != sg[i][j])
                     {
-                        res += j + " " + i + " " + bestMap[i][j] + " ";
+                        res += j + " " + i + " " + map[i][j] + " ";
                     }
                 }
             }
