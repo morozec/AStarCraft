@@ -8,9 +8,9 @@ class Robot
     public int Id { get; set; }
     public int X { get; set; }
     public int Y { get; set; }
-    public string Direction { get; set; }
+    public char Direction { get; set; }
 
-    public Robot(int id, int x, int y, string direction)
+    public Robot(int id, int x, int y, char direction)
     {
         Id = id;
         X = x;
@@ -19,252 +19,297 @@ class Robot
     }
 }
 
-class Node
-{
-    public int X { get; set; }
-    public int Y { get; set; }
-    public int Weight { get; set; }
-
-    public Node(int x, int y, int weight)
-    {
-        X = x;
-        Y = y;
-        Weight = weight;
-    }
-
-    public bool IsWall => Weight == 0;
-
-    public override string ToString()
-    {
-        return "Y=" + Y + " X=" + X;
-    }
-}
-
-class Graph
-{
-    public Node[][] Grid { get; set; }
-}
-
-
 class Player
 {
-    static IList<string> DIRECTIONS = new List<string>(){"R","L","D","U"};
-    
-    private static IDictionary<Tuple<int, int>, IList<string>> GetSavedDirectionsCopy(
-        IDictionary<Tuple<int, int>, IList<string>> savedDirections)
+    static IList<char> DIRECTIONS = new List<char>(){'.','R','L','D','U'};
+
+    static IDictionary<char[][], IList<Robot>> GetSplitedGrids(char[][] grid, IList<Robot> robots)
     {
-        var res = new Dictionary<Tuple<int, int>, IList<string>>();
-        foreach (var sdKey in savedDirections.Keys)
+        var res = new Dictionary<char[][], IList<Robot>>();
+        var gotRobots = new List<Robot>();
+        foreach (var robor in robots.Where(r => !gotRobots.Contains(r)))
         {
-            res.Add(sdKey, new List<string>());
-            foreach (var str in savedDirections[sdKey])
+            var sg = new Dictionary<Tuple<int, int>, IList<Robot>>();
+            BuildSplitedGrid(robor.Y, robor.X, grid, robots, sg);
+            var splitedGrid = new char[grid.Length][];
+            for (int i = 0; i < grid.Length; ++i)
             {
-                res[sdKey].Add(str);
+                splitedGrid[i] = Enumerable.Repeat('#', grid[i].Length).ToArray();
             }
+
+            var newRobots = new List<Robot>();
+            foreach (var pos in sg.Keys)
+            {
+                splitedGrid[pos.Item1][pos.Item2] = grid[pos.Item1][pos.Item2];
+                newRobots.AddRange(sg[pos]);
+            }
+            res.Add(splitedGrid, newRobots);
+            gotRobots.AddRange(newRobots);
         }
 
         return res;
     }
-    
-    private static Dictionary<Tuple<int, int>, string> GetMarkersCopy(
-        Dictionary<Tuple<int, int>, string> markers)
-    {
-        var res = new Dictionary<Tuple<int, int>, string>();
-        foreach (var mKey in markers.Keys)
-        {
-            res.Add(mKey, markers[mKey]);
-        } 
 
-        return res;
+    static void BuildSplitedGrid(int y, int x, char[][] grid, IList<Robot> robots, Dictionary<Tuple<int, int>, IList<Robot>> splitedGrid)
+    {
+        if (y < 0 || x < 0 || y > grid.Length - 1 || x > grid[y].Length - 1) return;
+        if (grid[y][x] == '#') return;
+        
+        var pos = new Tuple<int, int>(y, x);
+        if (splitedGrid.ContainsKey(pos)) return;
+        splitedGrid.Add(pos, new List<Robot>());
+        var robot = robots.SingleOrDefault(r => r.Y == y && r.X == x);
+        if (robot != null) splitedGrid[pos].Add(robot);
+        BuildSplitedGrid(y-1,x, grid, robots, splitedGrid);
+        BuildSplitedGrid(y+1,x, grid, robots, splitedGrid);
+        BuildSplitedGrid(y,x-1, grid, robots, splitedGrid);
+        BuildSplitedGrid(y,x+1, grid, robots, splitedGrid);
     }
     
-    static Node GetNextNode(
-        int y, 
-        int x, 
-        ref string direction, 
-        Graph graph,  
-        IDictionary<Tuple<int, int>, IList<string>> savedDirections,
-        Dictionary<Tuple<int, int>, string> markers,
-        out bool isCycle)
+    static void BuildPath(int y, int x, char direction, char[][] graph, IDictionary<Tuple<int, int>, IList<char>> path)
     {
-        isCycle = false;
-        var sdKey = new Tuple<int, int>(y, x);
-        if (markers.ContainsKey(sdKey)) direction = markers[sdKey];
+        var isOutsideGraph = y < 0 || x < 0 || y > graph.Length - 1 || x > graph[y].Length - 1;
+        if (isOutsideGraph) return; //вышли за пределы карты
+        if (graph[y][x] == '#') return;//упали в пропасть
+
+        if (graph[y][x] != '.')
+        {
+            direction = graph[y][x];
+        }
+
+        var key = new Tuple<int, int>(y, x);
+        if (!path.ContainsKey(key)) path.Add(key, new List<char>());
+        if (path[key].Any(s => s == direction))//мы зациклились
+        {
+            return;
+        }
         
-        switch (direction) {
-            case "R":
+        path[key].Add(direction);
+
+        switch (direction)
+        {
+            case 'R':
                 x++;
                 break;
-            case "L":
+            case 'L':
                 x--;
                 break;
-            case "U":
+            case 'U':
                 y--;
                 break;
-            case "D":
+            case 'D':
                 y++;
                 break;
         }
 
-        if (y < 0 || x < 0 || y >= graph.Grid.Length || x >= graph.Grid[y].Length || (graph.Grid[y][x]).IsWall)
-            return null;
-        
-        var nextSdKey = new Tuple<int, int>(y, x);
-        if (savedDirections.ContainsKey(nextSdKey))
-        {
-            foreach (var d in savedDirections[nextSdKey])
-            {
-                if (d == direction)
-                {
-                    isCycle = true;
-                    return null;
-                }
-            }
-            
-        }
-        return graph.Grid[y][x];
+        BuildPath(y, x, direction, graph, path);
     }
 
-    static IList<Node> GetBestTurnPath(
-        int y, 
-        int x, 
-        Graph graph, 
-        IDictionary<Tuple<int, int>, IList<string>> savedDirections, 
-        Dictionary<Tuple<int, int>, string> markers,
-        string currDirection,
-        bool isStart)
+    static int GetPathCount(IDictionary<Tuple<int, int>, IList<char>> path)
     {
-        IList<Node> nextPath = null;
-        var markerKey = new Tuple<int, int>(y, x);
-        
-        if (markers.ContainsKey(markerKey))
+        var count = 0;
+        foreach (var key in path.Keys)
         {
-            nextPath = MakeMaxPath(y, x, markers[markerKey], graph, GetSavedDirectionsCopy(savedDirections), markers);
-        }
-        //если мы уже были в этой позиции, то здесь нельзя ставить стрелку
-        else if (savedDirections.ContainsKey(markerKey) && savedDirections[markerKey].Any())
-        {
-            nextPath = MakeMaxPath(y, x, currDirection, graph,
-                GetSavedDirectionsCopy(savedDirections), markers);
-        }
-        else
-        {
-            Dictionary<Tuple<int, int>, string> bestMarkers = null;
-           
-            foreach (var d in DIRECTIONS)
-            {
-                var mc = GetMarkersCopy(markers);
-                if (!isStart || currDirection != d) mc[markerKey] = d;
-                var sdc = GetSavedDirectionsCopy(savedDirections);
-                if (!sdc.ContainsKey(markerKey)) sdc.Add(markerKey, new List<string>());
-                sdc[markerKey].Add(d);
-                
-                var directionPath =
-                    MakeMaxPath(y, x, d, graph, sdc, mc);
-                if (directionPath != null && (nextPath == null || directionPath.Count > nextPath.Count))
-                {
-                    nextPath = directionPath;
-                    bestMarkers = mc;
-                }
-            }
-            if (bestMarkers != null)
-            {
-                foreach (var key in bestMarkers.Keys)
-                {
-                    if (!markers.ContainsKey(key)) markers.Add(key, bestMarkers[key]);
-                }
-            }
+            count += path[key].Count;
         }
 
-        return nextPath;
+        return count;
     }
 
-    static IList<Node> MakeMaxPath(
-        int y, 
-        int x, 
-        string direction, 
-        Graph graph, 
-        IDictionary<Tuple<int, int>, IList<string>> savedDirections, 
-        Dictionary<Tuple<int, int>, string> markers)
+    static bool IsUpWall(char[][] graph, int i, int j)
     {
-        bool isCycled;
-        var nextNode = GetNextNode(y, x, ref direction, graph, savedDirections, markers, out isCycled);
-        var currPath = new List<Node>();
-
-        while (nextNode != null){
-            currPath.Add(nextNode);
-            var sdKey = new Tuple<int, int>(nextNode.Y, nextNode.X);
-            if (!savedDirections.ContainsKey(sdKey)) savedDirections.Add(sdKey, new List<string>());
-            savedDirections[sdKey].Add(direction);
-            nextNode = GetNextNode(nextNode.Y, nextNode.X, ref direction, graph, savedDirections, markers, out isCycled);
-        }
-        if (currPath.Count == 0) return null;
-        if (isCycled) return currPath;
-
-//        IList<Node> bestNextPath = null;
-//        var bestI = -1;
-//        Dictionary<Tuple<int, int>, string> bestMarkers = null;
-//        for (var i = 0; i < currPath.Count; ++i)
-//        {
-//            var step = currPath[i];
-//            var sdCopy = GetSavedDirectionsCopy(savedDirections);
-//            sdCopy[new Tuple<int, int>(step.Y, step.X)].Remove(direction);//т.к. это последний объект в ряду, его направление изменится 
-//            var markersCopy = GetMarkersCopy(markers);
-//            IList<Node> nextPath = GetBestTurnPath(step.Y, step.X, graph, sdCopy, markersCopy, direction, false);
-//            if (nextPath != null && (bestNextPath == null || nextPath.Count + i > bestNextPath.Count + bestI))
-//            {
-//                bestNextPath = nextPath;
-//                bestMarkers = markersCopy;
-//                bestI = i;
-//            }
-//        }
-
-        var lastY = currPath[currPath.Count - 1].Y;
-        var lastX = currPath[currPath.Count - 1].X;
-        savedDirections[new Tuple<int, int>(lastY, lastX)].Remove(direction);//т.к. это последний объект в ряду, его направление изменится 
-        IList<Node> nextPath = GetBestTurnPath(lastY, lastX, graph, savedDirections, markers, direction, false);
-        if (nextPath != null) foreach (var step in nextPath) currPath.Add(step);
-//        if (bestMarkers != null)
-//        {
-//            foreach (var key in bestMarkers.Keys)
-//            {
-//                if (!markers.ContainsKey(key)) markers.Add(key, bestMarkers[key]);
-//            }
-//        }
-//        
-//        if (bestNextPath != null) foreach (var step in bestNextPath) currPath.Add(step);
-        return currPath;
+        return i == 0 || graph[i - 1][j] == '#';
     }
     
+    static bool IsDownWall(char[][] graph, int i, int j)
+    {
+        return i == graph.Length - 1 || graph[i + 1][j] == '#';
+    }
+    
+    static bool IsLeftWall(char[][] graph, int i, int j)
+    {
+        return j == 0 || graph[i][j - 1] == '#';
+    }
+    
+    static bool IsRightWall(char[][] graph, int i, int j)
+    {
+        return  j == graph[i].Length - 1 || graph[i][j + 1] == '#';
+    }
+
+    static IDictionary<Tuple<int, int>, IList<char>> GetCrossPoints(char[][] graph, IList<Robot> robots)
+    {
+        var res = new Dictionary<Tuple<int, int>, IList<char>>();
+        for (var i = 0; i < graph.Length; ++i)
+        {
+            for (var j = 0; j < graph[i].Length; ++j)
+            {
+                if (graph[i][j] != '.') continue;
+                var wallsCount = 0;
+                var isLeftWall = IsLeftWall(graph, i, j);
+                var isRigthWall = IsRightWall(graph, i, j);
+                var isUpWall = IsUpWall(graph, i, j);
+                var isDownWall = IsDownWall(graph, i, j);
+                
+                if (isLeftWall) wallsCount++;
+                if (isRigthWall) wallsCount++;
+                if (isUpWall) wallsCount++;
+                if (isDownWall) wallsCount++;
+
+                var possDirections = new List<char>();
+                
+                if (wallsCount == 3)
+                {
+                    if (robots.Any(r => r.Y == i && r.X == j)) possDirections.Add('.');
+                    if (!isLeftWall) possDirections.Add('L');
+                    if (!isRigthWall) possDirections.Add('R');
+                    if (!isDownWall) possDirections.Add('D');
+                    if (!isUpWall) possDirections.Add('U');
+                }
+                else if (wallsCount == 2)
+                {
+                    if (!isLeftWall)
+                    {
+                        if (!isRigthWall) continue;
+                        if (robots.Any(r => r.Y == i && r.X == j)) possDirections.Add('.');
+                        possDirections.Add('L');
+                        if (!isUpWall)
+                            possDirections.Add('U');
+                        else if (!isDownWall)
+                            possDirections.Add('D');
+                    }
+                    else if (!isRigthWall)
+                    {
+                        if (!isLeftWall) continue;
+                        if (robots.Any(r => r.Y == i && r.X == j)) possDirections.Add('.');
+                        possDirections.Add('R');
+                        if (!isUpWall)
+                            possDirections.Add('U');
+                        else if (!isDownWall)
+                            possDirections.Add('D');
+                    }
+                }
+                else if (wallsCount == 1)
+                {
+                    if (robots.Any(r => r.Y == i && r.X == j)) possDirections.Add('.');
+                    if (isLeftWall)
+                    {
+                        possDirections.Add('R');
+                        possDirections.Add('D');
+                        possDirections.Add('U');
+                    }
+                    else if (isRigthWall)
+                    {
+                        possDirections.Add('L');
+                        possDirections.Add('D');
+                        possDirections.Add('U');
+                    }
+                    else if (isUpWall)
+                    {
+                        possDirections.Add('R');
+                        possDirections.Add('L');
+                        possDirections.Add('D');
+                    }
+                    else if (isDownWall)
+                    {
+                        possDirections.Add('R');
+                        possDirections.Add('L');
+                        possDirections.Add('U');
+                    }
+                }
+                if (possDirections.Any())
+                    res.Add(new Tuple<int, int>(i, j), possDirections);
+            }
+        }
+
+        return res;
+    }
+   
+    static IDictionary<Tuple<int, int>, char> GetBestArrowsPositions(char[][] grid, IList<Robot> robots)
+    {
+        var crossPoints = GetCrossPoints(grid, robots);
+        var cpList = crossPoints.Keys.ToList();
+        var arrowVariants = GetArrowsVariants(0, cpList, crossPoints);
+
+        var maxSummPathLength = 0;
+        IList<char> bestArrowVariant = null;
+
+        foreach (var av in arrowVariants)
+        {
+            var gridCopy = grid.Select(r => r.ToArray()).ToArray();
+            for (int j = 0; j < av.Count; ++j)
+            {
+                var arrow = av[j];
+                var cp = cpList[j];
+                gridCopy[cp.Item1][cp.Item2] = arrow;
+            }
+
+            var summPathLength = 0;
+            foreach (var robot in robots)
+            {
+                IDictionary<Tuple<int, int>, IList<char>> path = new Dictionary<Tuple<int, int>, IList<char>>();
+                BuildPath(robot.Y, robot.X, robot.Direction, gridCopy, path);
+                summPathLength += GetPathCount(path);
+            }
+
+            if (bestArrowVariant == null || summPathLength > maxSummPathLength)
+            {
+                bestArrowVariant = av;
+                maxSummPathLength = summPathLength;
+            }
+        }
+        
+        var res = new Dictionary<Tuple<int, int>, char>();
+        if (bestArrowVariant != null)
+        {
+            for (var j = 0; j < bestArrowVariant.Count; ++j)
+                res.Add(cpList[j], bestArrowVariant[j]);
+        }
+
+        return res;
+
+    }
+
+    static IList<IList<char>> GetArrowsVariants(int index,
+        IList<Tuple<int, int>> allPositions, IDictionary<Tuple<int, int>, IList<char>> possibleDirections)
+    {
+        var position = allPositions[index];
+        if (index == allPositions.Count - 1)
+        {
+            var oneElemList = new List<IList<char>>();
+            foreach (var d in possibleDirections[position])
+                oneElemList.Add(new List<char>() {d});
+            return oneElemList;
+        }
+
+        var res = new List<IList<char>>();
+        var nextVariants = GetArrowsVariants(index + 1, allPositions, possibleDirections);
+        foreach (var list in nextVariants)
+        {
+            foreach (var d in possibleDirections[position])
+            {
+                var listCopy = list.ToList();
+                listCopy.Insert(0, d);
+                res.Add(listCopy);
+            }
+        }
+
+
+        return res;
+    }
+
     static void Main(string[] args)
     {
-        var grid = new Node[10][];
-        var existingMarkers = new Dictionary<Tuple<int, int>, string>();
+        var grid = new char[10][];
        
         for (int i = 0; i < 10; i++)
         {
             string line = Console.ReadLine();
             Console.Error.WriteLine(line);
-            var row = new Node[line.Length];
-            var symbols = line.ToCharArray();
-            for (var j = 0; j < symbols.Length; ++j)
-            {
-                var weight = 1;
-                if (symbols[j] == '#')
-                {
-                    weight = 0;
-                }
-                else if (symbols[j] != '.')
-                {
-                    existingMarkers.Add(new Tuple<int, int>(i, j), symbols[j].ToString());
-                }
-                row[j] = new Node(j, i, weight);
-            }
-
+            var row = new char[line.Length];
+            for (var j = 0; j < line.Length; ++j)
+                row[j] = line[j];
             grid[i] = row;
         }
-
-        var graph = new Graph() {Grid = grid};
 
         var robots = new List<Robot>();
         
@@ -275,31 +320,30 @@ class Player
             string[] inputs = Console.ReadLine().Split(' ');
             int x = int.Parse(inputs[0]);
             int y = int.Parse(inputs[1]);
-            string direction = inputs[2];
+            var direction = inputs[2][0];
             robots.Add(new Robot(i, x, y, direction));
             Console.Error.WriteLine(x + " " + y + " " + direction);
         }
-
+        
         var res = "";
+        var splitedGris = GetSplitedGrids(grid, robots);
 
-        for (var r = 0; r < robotCount; ++r)
+        foreach (var sg in splitedGris.Keys)
         {
-            var robot = robots[r];
-            var savedDirections = new Dictionary<Tuple<int, int>, IList<string>>();
-            var markers = new Dictionary<Tuple<int,int>,string>();
-            foreach (var em in existingMarkers)
-                markers[em.Key] = em.Value;
-            
-            var btPath = GetBestTurnPath(robot.Y, robot.X, graph, savedDirections, markers, robot.Direction, true);
-
-            foreach (var item in markers.Where(i => !existingMarkers.ContainsKey(i.Key)))
+            var bestArrowsPositions = GetBestArrowsPositions(sg, splitedGris[sg]);
+            foreach (var pos in bestArrowsPositions.Keys)
             {
-                res += item.Key.Item2 + " " + item.Key.Item1 + " " + item.Value + " ";
+                if (bestArrowsPositions[pos] == '.') continue;
+                res += pos.Item2 + " " + pos.Item1 + " " + bestArrowsPositions[pos] + " ";
             }
         }
-
+        
         
 
-        Console.WriteLine(res.Remove(res.Length - 1));
+        if (res.Length > 0) res.Remove(res.Length - 1);
+        Console.WriteLine(res);
+
+        //Console.WriteLine(res.Remove(res.Length - 1));
     }
 }
+
