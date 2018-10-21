@@ -462,45 +462,36 @@ class Player
         foreach (var sg in splitedGris.Keys)
         {
             
-            PathMapContainer maxLengthApp = null;
-            var maxLength = -1;
-            for (var r = 0; r < splitedGris[sg].Count; ++r)
+            var startRobot = splitedGris[sg][0];
+            var apps = GetAllPossiblePathes(_tuples[startRobot.Y][startRobot.X], startRobot.Direction, sg, new List<Step>());
+            var sortedApps = apps.OrderBy(a => a.Path.Count).ToList();
+            var bestMap = sortedApps[0].Map;
+            
+            for (var i = 1; i < splitedGris[sg].Count; ++i)
             {
-                var startRobot = splitedGris[sg][r];
-                var apps = GetAllPossiblePathes(_tuples[startRobot.Y][startRobot.X], startRobot.Direction, sg, new List<Step>());
+                var currRobot = splitedGris[sg][i];
+                var currRobotApps = GetAllPossiblePathes(_tuples[currRobot.Y][currRobot.X], currRobot.Direction, bestMap, new List<Step>());
+                var maxLength = -1;
                 
-                foreach (var app in apps)
+                foreach (var cra in currRobotApps)
                 {
-                    var summPathLength = app.Path.Count;
-                    for (var i = 0; i < splitedGris[sg].Count; ++i)
+                    if (cra.Path.Count > maxLength)
                     {
-                        if (i==r) continue;
-                        var currRobot = splitedGris[sg][i];
-                        var path = new Dictionary<Tuple<int, int>, IList<char>>();
-                        BuildPath(currRobot.Y, currRobot.X, currRobot.Direction, sg, path);
-                        var pathLength = GetPathCount(path);
-                        summPathLength += pathLength;
-                    }
-
-                    if (summPathLength > maxLength)
-                    {
-                        maxLength = summPathLength;
-                        maxLengthApp = app;
+                        maxLength = cra.Path.Count;
+                        bestMap = cra.Map;
                     }
                 }
             }
             
+            if (bestMap == null) continue;
             
-            if (maxLengthApp == null) continue;
-            
-            var map = maxLengthApp.Map;
-            for (int i = 0; i < map.Length; i++)
+            for (int i = 0; i < bestMap.Length; i++)
             {
-                for (int j = 0; j < map[i].Length; j++)
+                for (int j = 0; j < bestMap[i].Length; j++)
                 {
-                    if (map[i][j] != sg[i][j])
+                    if (bestMap[i][j] != sg[i][j])
                     {
-                        res += j + " " + i + " " + map[i][j] + " ";
+                        res += j + " " + i + " " + bestMap[i][j] + " ";
                     }
                 }
             }
