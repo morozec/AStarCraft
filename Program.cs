@@ -250,6 +250,7 @@ class Player
         var crossPoints = GetCrossPoints(grid, robots);
         if (!crossPoints.Any()) return res;
         var cpList = crossPoints.Keys.ToList();
+        cpList = cpList.OrderBy(a => Guid.NewGuid()).ToList();
         var arrowVariants = GetArrowsVariants(0, cpList, crossPoints);
 
         var maxSummPathLength = 0;
