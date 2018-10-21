@@ -228,6 +228,14 @@ class Player
                         possDirections.Add('U');
                     }
                 }
+                else if (wallsCount == 4)
+                {
+                    if (robots.Any(r => r.Y == i && r.X == j)) possDirections.Add('.');
+                    possDirections.Add('R');
+                    possDirections.Add('L');
+                    possDirections.Add('D');
+                    possDirections.Add('U');
+                }
                 if (possDirections.Any())
                     res.Add(_tuples[i][j], possDirections);
             }
