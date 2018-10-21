@@ -461,29 +461,35 @@ class Player
         var splitedGris = GetSplitedGrids(grid, robots);
         foreach (var sg in splitedGris.Keys)
         {
-            var startRobot = splitedGris[sg][0];
-            var apps = GetAllPossiblePathes(_tuples[startRobot.Y][startRobot.X], startRobot.Direction, sg, new List<Step>());
             
-            var maxLength = -1;
             PathMapContainer maxLengthApp = null;
-            foreach (var app in apps)
+            var maxLength = -1;
+            for (var r = 0; r < splitedGris[sg].Count; ++r)
             {
-                var summPathLength = app.Path.Count;
-                for (var i = 1; i < splitedGris[sg].Count; ++i)
+                var startRobot = splitedGris[sg][r];
+                var apps = GetAllPossiblePathes(_tuples[startRobot.Y][startRobot.X], startRobot.Direction, sg, new List<Step>());
+                
+                foreach (var app in apps)
                 {
-                    var currRobot = splitedGris[sg][i];
-                    var path = new Dictionary<Tuple<int, int>, IList<char>>();
-                    BuildPath(currRobot.Y, currRobot.X, currRobot.Direction, sg, path);
-                    var pathLength = GetPathCount(path);
-                    summPathLength += pathLength;
-                }
+                    var summPathLength = app.Path.Count;
+                    for (var i = 0; i < splitedGris[sg].Count; ++i)
+                    {
+                        if (i==r) continue;
+                        var currRobot = splitedGris[sg][i];
+                        var path = new Dictionary<Tuple<int, int>, IList<char>>();
+                        BuildPath(currRobot.Y, currRobot.X, currRobot.Direction, sg, path);
+                        var pathLength = GetPathCount(path);
+                        summPathLength += pathLength;
+                    }
 
-                if (summPathLength > maxLength)
-                {
-                    maxLength = summPathLength;
-                    maxLengthApp = app;
+                    if (summPathLength > maxLength)
+                    {
+                        maxLength = summPathLength;
+                        maxLengthApp = app;
+                    }
                 }
             }
+            
             
             if (maxLengthApp == null) continue;
             
