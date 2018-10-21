@@ -19,10 +19,28 @@ class Robot
     }
 }
 
+class Step
+{
+    public Tuple<int,int> Pos { get; set; }
+    public char Direction { get; set; }
+}
+
+class PathMapContainer
+{
+    public IList<Step> Path { get; set; }
+    public char[][] Map { get; set; }
+
+    public PathMapContainer(IList<Step> path, char[][] map)
+    {
+        Path = path;
+        Map = map;
+    }
+}
+
 class Player
 {
     private static Random _rnd = new Random();
-    static IList<char> DIRECTIONS = new List<char>(){'.','R','L','D','U'};
+    static IList<char> DIRECTIONS = new List<char>(){'R','L','D','U'};
     private static Tuple<int, int>[][] _tuples;
 
     static int GetNormedCoord(int coord, int coordsCount)
@@ -340,6 +358,77 @@ class Player
         }
     }
 
+    static IList<PathMapContainer> GetOneDirectionContainer(Tuple<int, int> pos, char[][] grid, IList<Step> currPath,
+        char currDirection, char newDirection)
+    {
+        if (currPath.Any(s => s.Pos.Equals(pos) && s.Direction == newDirection)) return null;
+        int y = -1;
+        int x = -1;
+
+        switch (newDirection)
+        {
+            case 'D':
+                y = GetNormedCoord(pos.Item1 + 1, grid.Length);
+                x = pos.Item2;
+                break;
+            case 'U':
+                y = GetNormedCoord(pos.Item1 - 1, grid.Length);
+                x = pos.Item2;
+                break;
+            case 'L':
+                y = pos.Item1;
+                x = GetNormedCoord(pos.Item2 - 1, grid[pos.Item1].Length);
+                break;
+            case 'R':
+                y = pos.Item1;
+                x = GetNormedCoord(pos.Item2 + 1, grid[pos.Item1].Length);
+                break;
+        }
+
+        var currPathCopy = currPath.ToList();
+        currPathCopy.Add(new Step() {Pos = pos, Direction = newDirection});
+        var isGridChanged = false;
+        if (grid[pos.Item1][pos.Item2] == '.' && currDirection != newDirection)
+        {
+            grid[pos.Item1][pos.Item2] = newDirection;
+            isGridChanged = true;
+        }
+        var pathes = GetAllPossiblePathes(_tuples[y][x], newDirection, grid, currPathCopy);
+        if (isGridChanged) grid[pos.Item1][pos.Item2] = '.';
+        return pathes;
+    }
+
+    static IList<PathMapContainer> GetAllPossiblePathes(Tuple<int, int> pos, char direction, char[][] grid, IList<Step> currPath)
+    {
+        if (grid[pos.Item1][pos.Item2] == '#') return null;
+      
+        var res = new List<PathMapContainer>();
+
+        if (grid[pos.Item1][pos.Item2] != '.')//стрелка на карте
+        {
+            var odc = GetOneDirectionContainer(pos, grid, currPath, direction, grid[pos.Item1][pos.Item2]);
+            if (odc != null) res.AddRange(odc);
+        }
+        else if (currPath.Any(s => s.Pos.Equals(pos)))//уже были в этой точке. нельзя менять направление
+        {
+            var odc = GetOneDirectionContainer(pos, grid, currPath, direction, direction);
+            if (odc != null) res.AddRange(odc);
+        }
+        else
+        {
+            foreach (var d in DIRECTIONS)
+            {
+                var odc = GetOneDirectionContainer(pos, grid, currPath, direction, d);
+                if (odc != null) res.AddRange(odc);
+            }
+        }
+        
+        //grid[pos.Item1][pos.Item2] = '.';
+        if (res.Count == 0) res.Add(new PathMapContainer(currPath, grid.Select(a => a.ToArray()).ToArray()));
+        
+        return res;
+    }
+
     static void Main(string[] args)
     {
         var grid = new char[10][];
@@ -368,26 +457,67 @@ class Player
             robots.Add(new Robot(i, x, y, direction));
             Console.Error.WriteLine(x + " " + y + " " + direction);
         }
-        
         var res = "";
         var splitedGris = GetSplitedGrids(grid, robots);
-
         foreach (var sg in splitedGris.Keys)
         {
-            var bestArrowsPositions = GetBestArrowsPositions(sg, splitedGris[sg]);
-            foreach (var pos in bestArrowsPositions.Keys)
+            var startRobot = splitedGris[sg][0];
+            var apps = GetAllPossiblePathes(_tuples[startRobot.Y][startRobot.X], startRobot.Direction, sg, new List<Step>());
+            
+            var maxLength = -1;
+            PathMapContainer maxLengthApp = null;
+            foreach (var app in apps)
             {
-                if (bestArrowsPositions[pos] == '.') continue;
-                res += pos.Item2 + " " + pos.Item1 + " " + bestArrowsPositions[pos] + " ";
+                var summPathLength = app.Path.Count;
+                for (var i = 1; i < splitedGris[sg].Count; ++i)
+                {
+                    var currRobot = splitedGris[sg][i];
+                    var path = new Dictionary<Tuple<int, int>, IList<char>>();
+                    BuildPath(currRobot.Y, currRobot.X, currRobot.Direction, sg, path);
+                    var pathLength = GetPathCount(path);
+                    summPathLength += pathLength;
+                }
+
+                if (summPathLength > maxLength)
+                {
+                    maxLength = summPathLength;
+                    maxLengthApp = app;
+                }
+            }
+            
+            if (maxLengthApp == null) continue;
+            
+            var map = maxLengthApp.Map;
+            for (int i = 0; i < map.Length; i++)
+            {
+                for (int j = 0; j < map[i].Length; j++)
+                {
+                    if (map[i][j] != sg[i][j])
+                    {
+                        res += j + " " + i + " " + map[i][j] + " ";
+                    }
+                }
             }
         }
-        
-        
+      
 
+//        var res = "";
+//        var splitedGris = GetSplitedGrids(grid, robots);
+//
+//        foreach (var sg in splitedGris.Keys)
+//        {
+//            var bestArrowsPositions = GetBestArrowsPositions(sg, splitedGris[sg]);
+//            foreach (var pos in bestArrowsPositions.Keys)
+//            {
+//                if (bestArrowsPositions[pos] == '.') continue;
+//                res += pos.Item2 + " " + pos.Item1 + " " + bestArrowsPositions[pos] + " ";
+//            }
+//        }
+//        
+//
         if (res.Length > 0) res.Remove(res.Length - 1);
         Console.WriteLine(res);
 
-        //Console.WriteLine(res.Remove(res.Length - 1));
     }
 }
 
