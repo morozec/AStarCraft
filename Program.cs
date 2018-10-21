@@ -21,6 +21,7 @@ class Robot
 
 class Player
 {
+    private static Random _rnd = new Random();
     static IList<char> DIRECTIONS = new List<char>(){'.','R','L','D','U'};
     private static Tuple<int, int>[][] _tuples;
 
@@ -296,8 +297,17 @@ class Player
 
         var res = new List<IList<char>>();
         var nextVariants = GetArrowsVariants(index + 1, allPositions, possibleDirections);
+        var isEnough = nextVariants.Count * nextVariants[0].Count > 15000;
+        
         foreach (var list in nextVariants)
         {
+            if (isEnough)
+            {
+                var randomIndex = _rnd.Next(possibleDirections[position].Count);
+                list.Insert(0, possibleDirections[position][randomIndex]);
+                res.Add(list);
+                continue;
+            }
             foreach (var d in possibleDirections[position])
             {
                 var listCopy = list.ToList();
