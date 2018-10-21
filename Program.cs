@@ -23,6 +23,13 @@ class Player
 {
     static IList<char> DIRECTIONS = new List<char>(){'.','R','L','D','U'};
 
+    static int GetNormedCoord(int coord, int coordsCount)
+    {
+        if (coord < 0) coord = coordsCount - 1;
+        else if (coord > coordsCount - 1) coord = 0;
+        return coord;
+    }
+
     static IDictionary<char[][], IList<Robot>> GetSplitedGrids(char[][] grid, IList<Robot> robots)
     {
         var res = new Dictionary<char[][], IList<Robot>>();
@@ -52,7 +59,7 @@ class Player
 
     static void BuildSplitedGrid(int y, int x, char[][] grid, IList<Robot> robots, Dictionary<Tuple<int, int>, IList<Robot>> splitedGrid)
     {
-        if (y < 0 || x < 0 || y > grid.Length - 1 || x > grid[y].Length - 1) return;
+        //if (y < 0 || x < 0 || y > grid.Length - 1 || x > grid[y].Length - 1) return;
         if (grid[y][x] == '#') return;
         
         var pos = new Tuple<int, int>(y, x);
@@ -60,16 +67,16 @@ class Player
         splitedGrid.Add(pos, new List<Robot>());
         var robot = robots.SingleOrDefault(r => r.Y == y && r.X == x);
         if (robot != null) splitedGrid[pos].Add(robot);
-        BuildSplitedGrid(y-1,x, grid, robots, splitedGrid);
-        BuildSplitedGrid(y+1,x, grid, robots, splitedGrid);
-        BuildSplitedGrid(y,x-1, grid, robots, splitedGrid);
-        BuildSplitedGrid(y,x+1, grid, robots, splitedGrid);
+        BuildSplitedGrid(GetNormedCoord(y-1, grid.Length),x, grid, robots, splitedGrid);
+        BuildSplitedGrid(GetNormedCoord(y+1, grid.Length),x, grid, robots, splitedGrid);
+        BuildSplitedGrid(y,GetNormedCoord(x-1, grid[y].Length), grid, robots, splitedGrid);
+        BuildSplitedGrid(y,GetNormedCoord(x+1, grid[y].Length), grid, robots, splitedGrid);
     }
     
     static void BuildPath(int y, int x, char direction, char[][] graph, IDictionary<Tuple<int, int>, IList<char>> path)
     {
-        var isOutsideGraph = y < 0 || x < 0 || y > graph.Length - 1 || x > graph[y].Length - 1;
-        if (isOutsideGraph) return; //вышли за пределы карты
+        //var isOutsideGraph = y < 0 || x < 0 || y > graph.Length - 1 || x > graph[y].Length - 1;
+        //if (isOutsideGraph) return; //вышли за пределы карты
         if (graph[y][x] == '#') return;//упали в пропасть
 
         if (graph[y][x] != '.')
@@ -102,6 +109,9 @@ class Player
                 break;
         }
 
+        y = GetNormedCoord(y, graph.Length);
+        x = GetNormedCoord(x, graph[y].Length);
+
         BuildPath(y, x, direction, graph, path);
     }
 
@@ -118,22 +128,22 @@ class Player
 
     static bool IsUpWall(char[][] graph, int i, int j)
     {
-        return i == 0 || graph[i - 1][j] == '#';
+        return graph[GetNormedCoord(i - 1, graph.Length)][j] == '#';
     }
     
     static bool IsDownWall(char[][] graph, int i, int j)
     {
-        return i == graph.Length - 1 || graph[i + 1][j] == '#';
+        return graph[GetNormedCoord(i + 1, graph.Length)][j] == '#';
     }
     
     static bool IsLeftWall(char[][] graph, int i, int j)
     {
-        return j == 0 || graph[i][j - 1] == '#';
+        return graph[i][GetNormedCoord(j - 1, graph[i].Length)] == '#';
     }
     
     static bool IsRightWall(char[][] graph, int i, int j)
     {
-        return  j == graph[i].Length - 1 || graph[i][j + 1] == '#';
+        return  graph[i][GetNormedCoord(j + 1, graph[i].Length)] == '#';
     }
 
     static IDictionary<Tuple<int, int>, IList<char>> GetCrossPoints(char[][] graph, IList<Robot> robots)
@@ -226,7 +236,9 @@ class Player
    
     static IDictionary<Tuple<int, int>, char> GetBestArrowsPositions(char[][] grid, IList<Robot> robots)
     {
+        var res = new Dictionary<Tuple<int, int>, char>();
         var crossPoints = GetCrossPoints(grid, robots);
+        if (!crossPoints.Any()) return res;
         var cpList = crossPoints.Keys.ToList();
         var arrowVariants = GetArrowsVariants(0, cpList, crossPoints);
 
@@ -258,7 +270,7 @@ class Player
             }
         }
         
-        var res = new Dictionary<Tuple<int, int>, char>();
+        
         if (bestArrowVariant != null)
         {
             for (var j = 0; j < bestArrowVariant.Count; ++j)
