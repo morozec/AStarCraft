@@ -22,6 +22,7 @@ class Robot
 class Player
 {
     static IList<char> DIRECTIONS = new List<char>(){'.','R','L','D','U'};
+    private static Tuple<int, int>[][] _tuples;
 
     static int GetNormedCoord(int coord, int coordsCount)
     {
@@ -61,8 +62,8 @@ class Player
     {
         //if (y < 0 || x < 0 || y > grid.Length - 1 || x > grid[y].Length - 1) return;
         if (grid[y][x] == '#') return;
-        
-        var pos = new Tuple<int, int>(y, x);
+
+        var pos = _tuples[y][x];
         if (splitedGrid.ContainsKey(pos)) return;
         splitedGrid.Add(pos, new List<Robot>());
         var robot = robots.SingleOrDefault(r => r.Y == y && r.X == x);
@@ -84,7 +85,7 @@ class Player
             direction = graph[y][x];
         }
 
-        var key = new Tuple<int, int>(y, x);
+        var key = _tuples[y][x]; 
         if (!path.ContainsKey(key)) path.Add(key, new List<char>());
         if (path[key].Any(s => s == direction))//мы зациклились
         {
@@ -227,7 +228,7 @@ class Player
                     }
                 }
                 if (possDirections.Any())
-                    res.Add(new Tuple<int, int>(i, j), possDirections);
+                    res.Add(_tuples[i][j], possDirections);
             }
         }
 
@@ -309,6 +310,17 @@ class Player
         return res;
     }
 
+    static void InitTuples(char[][]grid)
+    {
+        _tuples = new Tuple<int, int>[grid.Length][];
+        for (var i = 0; i < grid.Length; ++i)
+        {
+            _tuples[i] = new Tuple<int, int>[grid[i].Length];
+            for (var j = 0; j < grid[i].Length; ++j)
+                _tuples[i][j] = new Tuple<int, int>(i, j);
+        }
+    }
+
     static void Main(string[] args)
     {
         var grid = new char[10][];
@@ -322,6 +334,7 @@ class Player
                 row[j] = line[j];
             grid[i] = row;
         }
+        InitTuples(grid);
 
         var robots = new List<Robot>();
         
