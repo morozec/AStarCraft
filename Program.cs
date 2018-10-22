@@ -266,7 +266,7 @@ class Player
         }
         else
         {
-            if (_counter > 10275)
+            if (_counter > 5000)
             {
                 var d = DIRECTIONS[_rnd.Next(DIRECTIONS.Count)];
                 var odc = GetOneDirectionContainer(pos, grid, currPath, direction, d, prevRobotsSteps);
@@ -330,10 +330,10 @@ class Player
             }
         }
 
-        if (robotIndex == robots.Count - 1)
+        if (robotIndex == 0)
             return newMapsDictionary;
         
-        return BuildBestMap(robots, robotIndex + 1, newMapsDictionary, newStepsDictionary);
+        return BuildBestMap(robots, robotIndex - 1, newMapsDictionary, newStepsDictionary);
     }
 
     static void Main(string[] args)
@@ -377,7 +377,7 @@ class Player
                 {
                     {sg, new Dictionary<Tuple<int, int>, IList<char>>()}
                 };
-            var bmd = BuildBestMap(splitedGris[sg], 0, mapsDictionary, prevRobotsSteps);
+            var bmd = BuildBestMap(splitedGris[sg], splitedGris[sg].Count - 1, mapsDictionary, prevRobotsSteps);
             
             var bestMap = bmd.Keys.OrderByDescending(k => bmd[k]).FirstOrDefault();
 
