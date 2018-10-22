@@ -21,7 +21,7 @@ class Robot
 
 class Step
 {
-    public Tuple<int,int> Pos { get; set; }
+    public Tuple<int, int> Pos { get; set; }
     public char Direction { get; set; }
     public override string ToString()
     {
@@ -31,7 +31,7 @@ class Step
 
 class PathMapContainer
 {
-    public IDictionary<Tuple<int,int>, List<char>> Path { get; set; }
+    public IDictionary<Tuple<int, int>, List<char>> Path { get; set; }
     public char[][] Map { get; set; }
 
     public PathMapContainer(IDictionary<Tuple<int, int>, List<char>> path, char[][] map)
@@ -49,7 +49,7 @@ class PathMapContainer
 class Player
 {
     private static Random _rnd = new Random();
-    static IList<char> DIRECTIONS = new List<char>(){'R','L','D','U'};
+    static IList<char> DIRECTIONS = new List<char>() { 'R', 'L', 'D', 'U' };
     private static Tuple<int, int>[][] _tuples;
 
     static int GetNormedCoord(int coord, int coordsCount)
@@ -96,12 +96,12 @@ class Player
         splitedGrid.Add(pos, new List<Robot>());
         var robot = robots.SingleOrDefault(r => r.Y == y && r.X == x);
         if (robot != null) splitedGrid[pos].Add(robot);
-        BuildSplitedGrid(GetNormedCoord(y-1, grid.Length),x, grid, robots, splitedGrid);
-        BuildSplitedGrid(GetNormedCoord(y+1, grid.Length),x, grid, robots, splitedGrid);
-        BuildSplitedGrid(y,GetNormedCoord(x-1, grid[y].Length), grid, robots, splitedGrid);
-        BuildSplitedGrid(y,GetNormedCoord(x+1, grid[y].Length), grid, robots, splitedGrid);
+        BuildSplitedGrid(GetNormedCoord(y - 1, grid.Length), x, grid, robots, splitedGrid);
+        BuildSplitedGrid(GetNormedCoord(y + 1, grid.Length), x, grid, robots, splitedGrid);
+        BuildSplitedGrid(y, GetNormedCoord(x - 1, grid[y].Length), grid, robots, splitedGrid);
+        BuildSplitedGrid(y, GetNormedCoord(x + 1, grid[y].Length), grid, robots, splitedGrid);
     }
-    
+
     static void BuildPath(int y, int x, char direction, char[][] graph, IDictionary<Tuple<int, int>, IList<char>> path)
     {
         //var isOutsideGraph = y < 0 || x < 0 || y > graph.Length - 1 || x > graph[y].Length - 1;
@@ -113,13 +113,13 @@ class Player
             direction = graph[y][x];
         }
 
-        var key = _tuples[y][x]; 
+        var key = _tuples[y][x];
         if (!path.ContainsKey(key)) path.Add(key, new List<char>());
         if (path[key].Any(s => s == direction))//мы зациклились
         {
             return;
         }
-        
+
         path[key].Add(direction);
 
         switch (direction)
@@ -159,23 +159,23 @@ class Player
     {
         return graph[GetNormedCoord(i - 1, graph.Length)][j] == '#';
     }
-    
+
     static bool IsDownWall(char[][] graph, int i, int j)
     {
         return graph[GetNormedCoord(i + 1, graph.Length)][j] == '#';
     }
-    
+
     static bool IsLeftWall(char[][] graph, int i, int j)
     {
         return graph[i][GetNormedCoord(j - 1, graph[i].Length)] == '#';
     }
-    
+
     static bool IsRightWall(char[][] graph, int i, int j)
     {
-        return  graph[i][GetNormedCoord(j + 1, graph[i].Length)] == '#';
+        return graph[i][GetNormedCoord(j + 1, graph[i].Length)] == '#';
     }
 
-    static void InitTuples(char[][]grid)
+    static void InitTuples(char[][] grid)
     {
         _tuples = new Tuple<int, int>[grid.Length][];
         for (var i = 0; i < grid.Length; ++i)
@@ -231,13 +231,13 @@ class Player
 
     private static int _counter = 0;
     static IList<PathMapContainer> GetAllPossiblePathes(
-        Tuple<int, int> pos, char direction, char[][] grid, IDictionary<Tuple<int, int>, List<char>> currPath, 
+        Tuple<int, int> pos, char direction, char[][] grid, IDictionary<Tuple<int, int>, List<char>> currPath,
         IDictionary<Tuple<int, int>, List<char>> prevRobotsSteps)
     {
         if (grid[pos.Item1][pos.Item2] == '#') return null;
-        
+
         _counter++;
-      
+
         var res = new List<PathMapContainer>();
 
 
@@ -266,7 +266,7 @@ class Player
         }
         else
         {
-            if (_counter > 950)
+            if (_counter > 1300)
             {
                 var d = DIRECTIONS[_rnd.Next(DIRECTIONS.Count)];
                 var odc = GetOneDirectionContainer(pos, grid, currPath, direction, d, prevRobotsSteps);
@@ -281,18 +281,18 @@ class Player
                 }
             }
         }
-        
-        
+
+
         //grid[pos.Item1][pos.Item2] = '.';
         if (res.Count == 0) res.Add(new PathMapContainer(currPath, grid.Select(a => a.ToArray()).ToArray()));
-        
+
         return res;
     }
 
     static IDictionary<char[][], int> BuildBestMap(
-        IList<Robot> robots, 
-        int robotIndex, 
-        IDictionary<char[][], int> mapsDictionary, 
+        IList<Robot> robots,
+        int robotIndex,
+        IDictionary<char[][], int> mapsDictionary,
         IDictionary<char[][], IDictionary<Tuple<int, int>, List<char>>> prevRobotsSteps)
     {
         var robot = robots[robotIndex];
@@ -317,7 +317,7 @@ class Player
                 //    sumPathLength += GetPathCount(prevRobotPath);
                 //}
                 newMapsDictionary.Add(appMap, sumPathLength);
-                var steps = prevRobotsSteps[map].ToDictionary(e => e.Key, e => e.Value.ToList());
+                var steps = new Dictionary<Tuple<int, int>, List<char>>(prevRobotsSteps[map]);
                 foreach (var s in appPath.Keys)
                 {
                     if (!steps.ContainsKey(s)) steps.Add(s, new List<char>());
@@ -332,14 +332,14 @@ class Player
 
         if (robotIndex == 0)
             return newMapsDictionary;
-        
+
         return BuildBestMap(robots, robotIndex - 1, newMapsDictionary, newStepsDictionary);
     }
 
     static void Main(string[] args)
     {
         var grid = new char[10][];
-       
+
         for (int i = 0; i < 10; i++)
         {
             string line = Console.ReadLine();
@@ -352,7 +352,7 @@ class Player
         InitTuples(grid);
 
         var robots = new List<Robot>();
-        
+
         int robotCount = int.Parse(Console.ReadLine());
         Console.Error.WriteLine(robotCount);
         for (int i = 0; i < robotCount; i++)
@@ -378,7 +378,7 @@ class Player
                     {sg, new Dictionary<Tuple<int, int>, List<char>>()}
                 };
             var bmd = BuildBestMap(splitedGris[sg], splitedGris[sg].Count - 1, mapsDictionary, prevRobotsSteps);
-            
+
             var bestMap = bmd.Keys.OrderByDescending(k => bmd[k]).FirstOrDefault();
 
             if (bestMap == null) continue;
