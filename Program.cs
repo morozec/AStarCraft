@@ -31,10 +31,10 @@ class Step
 
 class PathMapContainer
 {
-    public IDictionary<Tuple<int,int>, IList<char>> Path { get; set; }
+    public IDictionary<Tuple<int,int>, List<char>> Path { get; set; }
     public char[][] Map { get; set; }
 
-    public PathMapContainer(IDictionary<Tuple<int, int>, IList<char>> path, char[][] map)
+    public PathMapContainer(IDictionary<Tuple<int, int>, List<char>> path, char[][] map)
     {
         Path = path;
         Map = map;
@@ -186,8 +186,8 @@ class Player
         }
     }
 
-    static IList<PathMapContainer> GetOneDirectionContainer(Tuple<int, int> pos, char[][] grid, IDictionary<Tuple<int, int>, IList<char>> currPath,
-        char currDirection, char newDirection, IDictionary<Tuple<int, int>, IList<char>> prevRobotsSteps)
+    static IList<PathMapContainer> GetOneDirectionContainer(Tuple<int, int> pos, char[][] grid, IDictionary<Tuple<int, int>, List<char>> currPath,
+        char currDirection, char newDirection, IDictionary<Tuple<int, int>, List<char>> prevRobotsSteps)
     {
         if (currPath.ContainsKey(pos) && currPath[pos].Any(s => s == newDirection)) return null;
         int y = -1;
@@ -213,7 +213,7 @@ class Player
                 break;
         }
 
-        var currPathCopy = currPath.ToDictionary(etry => etry.Key, entry => entry.Value);
+        var currPathCopy = currPath.ToDictionary(etry => etry.Key, entry => entry.Value.ToList());
         if (!currPathCopy.ContainsKey(pos)) currPathCopy.Add(pos, new List<char>());
         currPathCopy[pos].Add(newDirection);
 
@@ -231,8 +231,8 @@ class Player
 
     private static int _counter = 0;
     static IList<PathMapContainer> GetAllPossiblePathes(
-        Tuple<int, int> pos, char direction, char[][] grid, IDictionary<Tuple<int, int>, IList<char>> currPath, 
-        IDictionary<Tuple<int, int>, IList<char>> prevRobotsSteps)
+        Tuple<int, int> pos, char direction, char[][] grid, IDictionary<Tuple<int, int>, List<char>> currPath, 
+        IDictionary<Tuple<int, int>, List<char>> prevRobotsSteps)
     {
         if (grid[pos.Item1][pos.Item2] == '#') return null;
         
@@ -266,7 +266,7 @@ class Player
         }
         else
         {
-            if (_counter > 5000)
+            if (_counter > 950)
             {
                 var d = DIRECTIONS[_rnd.Next(DIRECTIONS.Count)];
                 var odc = GetOneDirectionContainer(pos, grid, currPath, direction, d, prevRobotsSteps);
@@ -293,16 +293,16 @@ class Player
         IList<Robot> robots, 
         int robotIndex, 
         IDictionary<char[][], int> mapsDictionary, 
-        IDictionary<char[][], IDictionary<Tuple<int, int>, IList<char>>> prevRobotsSteps)
+        IDictionary<char[][], IDictionary<Tuple<int, int>, List<char>>> prevRobotsSteps)
     {
         var robot = robots[robotIndex];
         var maps = mapsDictionary.Keys.OrderByDescending(k => mapsDictionary[k]);
         var newMapsDictionary = new Dictionary<char[][], int>();
-        var newStepsDictionary = new Dictionary<char[][], IDictionary<Tuple<int, int>, IList<char>>>();
+        var newStepsDictionary = new Dictionary<char[][], IDictionary<Tuple<int, int>, List<char>>>();
         foreach (var map in maps)
         {
             var apps = GetAllPossiblePathes(
-                _tuples[robot.Y][robot.X], robot.Direction, map, new Dictionary<Tuple<int, int>, IList<char>>(), prevRobotsSteps[map]);
+                _tuples[robot.Y][robot.X], robot.Direction, map, new Dictionary<Tuple<int, int>, List<char>>(), prevRobotsSteps[map]);
             foreach (var app in apps)
             {
                 var appPath = app.Path;
@@ -317,7 +317,7 @@ class Player
                 //    sumPathLength += GetPathCount(prevRobotPath);
                 //}
                 newMapsDictionary.Add(appMap, sumPathLength);
-                var steps = prevRobotsSteps[map].ToDictionary(e => e.Key, e => e.Value);
+                var steps = prevRobotsSteps[map].ToDictionary(e => e.Key, e => e.Value.ToList());
                 foreach (var s in appPath.Keys)
                 {
                     if (!steps.ContainsKey(s)) steps.Add(s, new List<char>());
@@ -373,9 +373,9 @@ class Player
             //var apps = GetAllPossiblePathes(_tuples[startRobot.Y][startRobot.X], startRobot.Direction, sg, new List<Step>());
             var mapsDictionary = new Dictionary<char[][], int>() { { sg, 0 } };
             var prevRobotsSteps =
-                new Dictionary<char[][], IDictionary<Tuple<int, int>, IList<char>>>()
+                new Dictionary<char[][], IDictionary<Tuple<int, int>, List<char>>>()
                 {
-                    {sg, new Dictionary<Tuple<int, int>, IList<char>>()}
+                    {sg, new Dictionary<Tuple<int, int>, List<char>>()}
                 };
             var bmd = BuildBestMap(splitedGris[sg], splitedGris[sg].Count - 1, mapsDictionary, prevRobotsSteps);
             
