@@ -253,7 +253,8 @@ class Player
                 break;
         }
 
-        var isSame = !(IsUpWall(grid, pos.Item1, pos.Item2) ^ IsUpWall(grid, y, x)) &&
+        var isSame = grid[pos.Item1][pos.Item2] == '.' && grid[y][x] == '.' &&
+                     !(IsUpWall(grid, pos.Item1, pos.Item2) ^ IsUpWall(grid, y, x)) &&
                      !(IsDownWall(grid, pos.Item1, pos.Item2) ^ IsDownWall(grid, y, x)) &&
                      !(IsRightWall(grid, pos.Item1, pos.Item2) ^ IsRightWall(grid, y, x)) &&
                      !(IsLeftWall(grid, pos.Item1, pos.Item2) ^ IsLeftWall(grid, y, x));
