@@ -263,6 +263,7 @@ class Player
     }
 
     private static int _counter = 0;
+    private static int _robotsCount = 0;
     static IList<PathMapContainer> GetAllPossiblePathes(
         Tuple<int, int> pos, char direction, char[][] grid, IDictionary<Tuple<int, int>, List<char>> currPath,
         IDictionary<Tuple<int, int>, List<char>> prevRobotsSteps)
@@ -299,7 +300,7 @@ class Player
         }
         else
         {
-            if (_counter > 1300)
+            if (_counter * _robotsCount > 5000)
             {
                 var d = DIRECTIONS[_rnd.Next(DIRECTIONS.Count)];
                 var odc = GetOneDirectionContainer(pos, grid, currPath, direction, d, prevRobotsSteps);
@@ -402,6 +403,7 @@ class Player
         foreach (var sg in splitedGris.Keys)
         {
             _counter = 0;
+            _robotsCount = splitedGris[sg].Count;
             //var startRobot = splitedGris[sg][0];
             //var apps = GetAllPossiblePathes(_tuples[startRobot.Y][startRobot.X], startRobot.Direction, sg, new List<Step>());
             var mapsDictionary = new Dictionary<char[][], int>() { { sg, 0 } };
