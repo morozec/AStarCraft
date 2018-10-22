@@ -166,187 +166,6 @@ class Player
         return  graph[i][GetNormedCoord(j + 1, graph[i].Length)] == '#';
     }
 
-    static IDictionary<Tuple<int, int>, IList<char>> GetCrossPoints(char[][] graph, IList<Robot> robots)
-    {
-        var res = new Dictionary<Tuple<int, int>, IList<char>>();
-        for (var i = 0; i < graph.Length; ++i)
-        {
-            for (var j = 0; j < graph[i].Length; ++j)
-            {
-                if (graph[i][j] != '.') continue;
-                var wallsCount = 0;
-                var isLeftWall = IsLeftWall(graph, i, j);
-                var isRigthWall = IsRightWall(graph, i, j);
-                var isUpWall = IsUpWall(graph, i, j);
-                var isDownWall = IsDownWall(graph, i, j);
-                
-                if (isLeftWall) wallsCount++;
-                if (isRigthWall) wallsCount++;
-                if (isUpWall) wallsCount++;
-                if (isDownWall) wallsCount++;
-
-                var possDirections = new List<char>();
-                
-                if (wallsCount == 3)
-                {
-                    if (robots.Any(r => r.Y == i && r.X == j)) possDirections.Add('.');
-                    if (!isLeftWall) possDirections.Add('L');
-                    if (!isRigthWall) possDirections.Add('R');
-                    if (!isDownWall) possDirections.Add('D');
-                    if (!isUpWall) possDirections.Add('U');
-                }
-                else if (wallsCount == 2)
-                {
-                    if (!isLeftWall)
-                    {
-                        if (!isRigthWall) continue;
-                        if (robots.Any(r => r.Y == i && r.X == j)) possDirections.Add('.');
-                        possDirections.Add('L');
-                        if (!isUpWall)
-                            possDirections.Add('U');
-                        else if (!isDownWall)
-                            possDirections.Add('D');
-                    }
-                    else if (!isRigthWall)
-                    {
-                        if (!isLeftWall) continue;
-                        if (robots.Any(r => r.Y == i && r.X == j)) possDirections.Add('.');
-                        possDirections.Add('R');
-                        if (!isUpWall)
-                            possDirections.Add('U');
-                        else if (!isDownWall)
-                            possDirections.Add('D');
-                    }
-                }
-                else if (wallsCount == 1)
-                {
-                    if (robots.Any(r => r.Y == i && r.X == j)) possDirections.Add('.');
-                    if (isLeftWall)
-                    {
-                        possDirections.Add('R');
-                        possDirections.Add('D');
-                        possDirections.Add('U');
-                    }
-                    else if (isRigthWall)
-                    {
-                        possDirections.Add('L');
-                        possDirections.Add('D');
-                        possDirections.Add('U');
-                    }
-                    else if (isUpWall)
-                    {
-                        possDirections.Add('R');
-                        possDirections.Add('L');
-                        possDirections.Add('D');
-                    }
-                    else if (isDownWall)
-                    {
-                        possDirections.Add('R');
-                        possDirections.Add('L');
-                        possDirections.Add('U');
-                    }
-                }
-                else if (wallsCount == 4)
-                {
-                    if (robots.Any(r => r.Y == i && r.X == j)) possDirections.Add('.');
-                    possDirections.Add('R');
-                    possDirections.Add('L');
-                    possDirections.Add('D');
-                    possDirections.Add('U');
-                }
-                if (possDirections.Any())
-                    res.Add(_tuples[i][j], possDirections);
-            }
-        }
-
-        return res;
-    }
-   
-    static IDictionary<Tuple<int, int>, char> GetBestArrowsPositions(char[][] grid, IList<Robot> robots)
-    {
-        var res = new Dictionary<Tuple<int, int>, char>();
-        var crossPoints = GetCrossPoints(grid, robots);
-        if (!crossPoints.Any()) return res;
-        var cpList = crossPoints.Keys.ToList();
-        cpList = cpList.OrderBy(a => Guid.NewGuid()).ToList();
-        var arrowVariants = GetArrowsVariants(0, cpList, crossPoints);
-
-        var maxSummPathLength = 0;
-        IList<char> bestArrowVariant = null;
-
-        foreach (var av in arrowVariants)
-        {
-            var gridCopy = grid.Select(r => r.ToArray()).ToArray();
-            for (int j = 0; j < av.Count; ++j)
-            {
-                var arrow = av[j];
-                var cp = cpList[j];
-                gridCopy[cp.Item1][cp.Item2] = arrow;
-            }
-
-            var summPathLength = 0;
-            foreach (var robot in robots)
-            {
-                IDictionary<Tuple<int, int>, IList<char>> path = new Dictionary<Tuple<int, int>, IList<char>>();
-                BuildPath(robot.Y, robot.X, robot.Direction, gridCopy, path);
-                summPathLength += GetPathCount(path);
-            }
-
-            if (bestArrowVariant == null || summPathLength > maxSummPathLength)
-            {
-                bestArrowVariant = av;
-                maxSummPathLength = summPathLength;
-            }
-        }
-        
-        
-        if (bestArrowVariant != null)
-        {
-            for (var j = 0; j < bestArrowVariant.Count; ++j)
-                res.Add(cpList[j], bestArrowVariant[j]);
-        }
-
-        return res;
-
-    }
-
-    static IList<IList<char>> GetArrowsVariants(int index,
-        IList<Tuple<int, int>> allPositions, IDictionary<Tuple<int, int>, IList<char>> possibleDirections)
-    {
-        var position = allPositions[index];
-        if (index == allPositions.Count - 1)
-        {
-            var oneElemList = new List<IList<char>>();
-            foreach (var d in possibleDirections[position])
-                oneElemList.Add(new List<char>() {d});
-            return oneElemList;
-        }
-
-        var res = new List<IList<char>>();
-        var nextVariants = GetArrowsVariants(index + 1, allPositions, possibleDirections);
-        var isEnough = nextVariants.Count * nextVariants[0].Count > 15000;
-        
-        foreach (var list in nextVariants)
-        {
-            if (isEnough)
-            {
-                var randomIndex = _rnd.Next(possibleDirections[position].Count);
-                list.Insert(0, possibleDirections[position][randomIndex]);
-                res.Add(list);
-                continue;
-            }
-            foreach (var d in possibleDirections[position])
-            {
-                var listCopy = list.ToList();
-                listCopy.Insert(0, d);
-                res.Add(listCopy);
-            }
-        }
-
-
-        return res;
-    }
-
     static void InitTuples(char[][]grid)
     {
         _tuples = new Tuple<int, int>[grid.Length][];
@@ -405,6 +224,18 @@ class Player
         if (grid[pos.Item1][pos.Item2] == '#') return null;
         
         _counter++;
+        
+        var isCorridorCell = false;
+        if (IsLeftWall(grid, pos.Item1, pos.Item2) && IsRightWall(grid, pos.Item1, pos.Item2) &&
+            !IsUpWall(grid, pos.Item1, pos.Item2) && !IsDownWall(grid, pos.Item1, pos.Item2))
+        {
+            isCorridorCell = true;
+        }
+        else if (!IsLeftWall(grid, pos.Item1, pos.Item2) && !IsRightWall(grid, pos.Item1, pos.Item2) &&
+                 IsUpWall(grid, pos.Item1, pos.Item2) && IsDownWall(grid, pos.Item1, pos.Item2))
+        {
+            isCorridorCell = true;
+        } 
       
         var res = new List<PathMapContainer>();
 
@@ -413,7 +244,7 @@ class Player
             var odc = GetOneDirectionContainer(pos, grid, currPath, direction, grid[pos.Item1][pos.Item2]);
             if (odc != null) res.AddRange(odc);
         }
-        else if (currPath.Any(s => s.Pos.Equals(pos)))//уже были в этой точке. нельзя менять направление
+        else if (currPath.Any(s => s.Pos.Equals(pos)) || isCorridorCell)//уже были в этой точке. нельзя менять направление
         {
             var odc = GetOneDirectionContainer(pos, grid, currPath, direction, direction);
             if (odc != null) res.AddRange(odc);
@@ -518,22 +349,7 @@ class Player
                 }
             }
         }
-      
 
-//        var res = "";
-//        var splitedGris = GetSplitedGrids(grid, robots);
-//
-//        foreach (var sg in splitedGris.Keys)
-//        {
-//            var bestArrowsPositions = GetBestArrowsPositions(sg, splitedGris[sg]);
-//            foreach (var pos in bestArrowsPositions.Keys)
-//            {
-//                if (bestArrowsPositions[pos] == '.') continue;
-//                res += pos.Item2 + " " + pos.Item1 + " " + bestArrowsPositions[pos] + " ";
-//            }
-//        }
-//        
-//
         if (res.Length > 0) res.Remove(res.Length - 1);
         Console.WriteLine(res);
 
