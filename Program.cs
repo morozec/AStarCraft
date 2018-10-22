@@ -228,6 +228,38 @@ class Player
         return pathes;
     }
 
+    static bool IsNextCellTheSame(Tuple<int, int> pos, char direction, char[][] grid)
+    {
+        int y = -1;
+        int x = -1;
+
+        switch (direction)
+        {
+            case 'D':
+                y = GetNormedCoord(pos.Item1 + 1, grid.Length);
+                x = pos.Item2;
+                break;
+            case 'U':
+                y = GetNormedCoord(pos.Item1 - 1, grid.Length);
+                x = pos.Item2;
+                break;
+            case 'L':
+                y = pos.Item1;
+                x = GetNormedCoord(pos.Item2 - 1, grid[pos.Item1].Length);
+                break;
+            case 'R':
+                y = pos.Item1;
+                x = GetNormedCoord(pos.Item2 + 1, grid[pos.Item1].Length);
+                break;
+        }
+
+        var isSame = !(IsUpWall(grid, pos.Item1, pos.Item2) ^ IsUpWall(grid, y, x)) &&
+                     !(IsDownWall(grid, pos.Item1, pos.Item2) ^ IsDownWall(grid, y, x)) &&
+                     !(IsRightWall(grid, pos.Item1, pos.Item2) ^ IsRightWall(grid, y, x)) &&
+                     !(IsLeftWall(grid, pos.Item1, pos.Item2) ^ IsLeftWall(grid, y, x));
+
+        return isSame;
+    }
 
     private static int _counter = 0;
     static IList<PathMapContainer> GetAllPossiblePathes(
@@ -246,7 +278,7 @@ class Player
             var odc = GetOneDirectionContainer(pos, grid, currPath, direction, grid[pos.Item1][pos.Item2], prevRobotsSteps);
             if (odc != null) res.AddRange(odc);
         }
-        else if (currPath.ContainsKey(pos))//уже были в этой точке. нельзя менять направление
+        else if (currPath.ContainsKey(pos) || IsNextCellTheSame(pos, direction, grid))//уже были в этой точке. нельзя менять направление (или след. точка такая же)
         {
             var odc = GetOneDirectionContainer(pos, grid, currPath, direction, direction, prevRobotsSteps);
             if (odc != null) res.AddRange(odc);
