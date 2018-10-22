@@ -23,6 +23,10 @@ class Step
 {
     public Tuple<int,int> Pos { get; set; }
     public char Direction { get; set; }
+    public override string ToString()
+    {
+        return Pos.ToString();
+    }
 }
 
 class PathMapContainer
@@ -34,6 +38,11 @@ class PathMapContainer
     {
         Path = path;
         Map = map;
+    }
+
+    public override string ToString()
+    {
+        return Path.Count.ToString();
     }
 }
 
@@ -178,7 +187,7 @@ class Player
     }
 
     static IList<PathMapContainer> GetOneDirectionContainer(Tuple<int, int> pos, char[][] grid, IList<Step> currPath,
-        char currDirection, char newDirection)
+        char currDirection, char newDirection, IList<Step> prevRobotsSteps)
     {
         if (currPath.Any(s => s.Pos.Equals(pos) && s.Direction == newDirection)) return null;
         int y = -1;
@@ -212,57 +221,61 @@ class Player
             grid[pos.Item1][pos.Item2] = newDirection;
             isGridChanged = true;
         }
-        var pathes = GetAllPossiblePathes(_tuples[y][x], newDirection, grid, currPathCopy);
+        var pathes = GetAllPossiblePathes(_tuples[y][x], newDirection, grid, currPathCopy, prevRobotsSteps);
         if (isGridChanged) grid[pos.Item1][pos.Item2] = '.';
         return pathes;
     }
 
 
     private static int _counter = 0;
-    static IList<PathMapContainer> GetAllPossiblePathes(Tuple<int, int> pos, char direction, char[][] grid, IList<Step> currPath)
+    static IList<PathMapContainer> GetAllPossiblePathes(
+        Tuple<int, int> pos, char direction, char[][] grid, IList<Step> currPath, IList<Step> prevRobotsSteps)
     {
         if (grid[pos.Item1][pos.Item2] == '#') return null;
         
         _counter++;
-        
-        var isCorridorCell = false;
-        if (IsLeftWall(grid, pos.Item1, pos.Item2) && IsRightWall(grid, pos.Item1, pos.Item2) &&
-            !IsUpWall(grid, pos.Item1, pos.Item2) && !IsDownWall(grid, pos.Item1, pos.Item2))
-        {
-            isCorridorCell = true;
-        }
-        else if (!IsLeftWall(grid, pos.Item1, pos.Item2) && !IsRightWall(grid, pos.Item1, pos.Item2) &&
-                 IsUpWall(grid, pos.Item1, pos.Item2) && IsDownWall(grid, pos.Item1, pos.Item2))
-        {
-            isCorridorCell = true;
-        } 
       
         var res = new List<PathMapContainer>();
 
+
         if (grid[pos.Item1][pos.Item2] != '.')//стрелка на карте
         {
-            var odc = GetOneDirectionContainer(pos, grid, currPath, direction, grid[pos.Item1][pos.Item2]);
+            var odc = GetOneDirectionContainer(pos, grid, currPath, direction, grid[pos.Item1][pos.Item2], prevRobotsSteps);
             if (odc != null) res.AddRange(odc);
         }
-        else if (currPath.Any(s => s.Pos.Equals(pos)) || isCorridorCell)//уже были в этой точке. нельзя менять направление
+        else if (currPath.Any(s => s.Pos.Equals(pos)))//уже были в этой точке. нельзя менять направление
         {
-            var odc = GetOneDirectionContainer(pos, grid, currPath, direction, direction);
+            var odc = GetOneDirectionContainer(pos, grid, currPath, direction, direction, prevRobotsSteps);
             if (odc != null) res.AddRange(odc);
         }
         else
         {
-            if (_counter > 10275)
+            var prevRobotSteps = prevRobotsSteps.Where(s => s.Pos.Equals(pos)).ToList();
+            if (prevRobotSteps.Count >= 2) //прошлый робот был здесь несколько раз. нельзя менять направление
             {
-                var d = DIRECTIONS[_rnd.Next(DIRECTIONS.Count)];
-                var odc = GetOneDirectionContainer(pos, grid, currPath, direction, d);
+                var odc = GetOneDirectionContainer(pos, grid, currPath, direction, direction, prevRobotsSteps);
+                if (odc != null) res.AddRange(odc);
+            }
+            else if (prevRobotSteps.Count == 1)//прошлый робот был здесь 1 раз. можно выставить стрелку только в его сторону
+            {
+                var odc = GetOneDirectionContainer(pos, grid, currPath, direction, prevRobotSteps[0].Direction, prevRobotsSteps);
                 if (odc != null) res.AddRange(odc);
             }
             else
             {
-                foreach (var d in DIRECTIONS)
+                if (_counter > 10275)
                 {
-                    var odc = GetOneDirectionContainer(pos, grid, currPath, direction, d);
+                    var d = DIRECTIONS[_rnd.Next(DIRECTIONS.Count)];
+                    var odc = GetOneDirectionContainer(pos, grid, currPath, direction, d, prevRobotsSteps);
                     if (odc != null) res.AddRange(odc);
+                }
+                else
+                {
+                    foreach (var d in DIRECTIONS)
+                    {
+                        var odc = GetOneDirectionContainer(pos, grid, currPath, direction, d, prevRobotsSteps);
+                        if (odc != null) res.AddRange(odc);
+                    }
                 }
             }
         }
@@ -271,6 +284,42 @@ class Player
         if (res.Count == 0) res.Add(new PathMapContainer(currPath, grid.Select(a => a.ToArray()).ToArray()));
         
         return res;
+    }
+
+    static IDictionary<char[][], int> BuildBestMap(
+        IList<Robot> robots, int robotIndex, IDictionary<char[][], int> mapsDictionary, IDictionary<char[][], IList<Step>> prevRobotsSteps)
+    {
+        var robot = robots[robotIndex];
+        var maps = mapsDictionary.Keys.OrderByDescending(k => mapsDictionary[k]);
+        var newMapsDictionary = new Dictionary<char[][], int>();
+        var newStepsDictionary = new Dictionary<char[][], IList<Step>>();
+        foreach (var map in maps)
+        {
+            var apps = GetAllPossiblePathes(_tuples[robot.Y][robot.X], robot.Direction, map, new List<Step>(), prevRobotsSteps[map]);
+            foreach (var app in apps)
+            {
+                var appPath = app.Path;
+                var appMap = app.Map;
+
+                var sumPathLength = appPath.Count + mapsDictionary[map];
+                //for (var j = 0; j < robotIndex; ++j)
+                //{
+                //    var prevRobot = robots[j];
+                //    IDictionary<Tuple<int, int>, IList<char>> prevRobotPath = new Dictionary<Tuple<int, int>, IList<char>>();
+                //    BuildPath(prevRobot.Y, prevRobot.X, prevRobot.Direction, appMap, prevRobotPath);
+                //    sumPathLength += GetPathCount(prevRobotPath);
+                //}
+                newMapsDictionary.Add(appMap, sumPathLength);
+                var steps = prevRobotsSteps[map].ToList();
+                foreach (var s in appPath) steps.Add(s);
+                newStepsDictionary.Add(appMap, steps);
+            }
+        }
+
+        if (robotIndex == robots.Count - 1)
+            return newMapsDictionary;
+        
+        return BuildBestMap(robots, robotIndex + 1, newMapsDictionary, newStepsDictionary);
     }
 
     static void Main(string[] args)
@@ -306,45 +355,22 @@ class Player
         foreach (var sg in splitedGris.Keys)
         {
             _counter = 0;
-            PathMapContainer maxLengthApp = null;
-            var maxLength = -1;
-            for (var r = splitedGris[sg].Count - 1; r >= 0; --r)
-            {
-                var startRobot = splitedGris[sg][r];
-                var apps = GetAllPossiblePathes(_tuples[startRobot.Y][startRobot.X], startRobot.Direction, sg, new List<Step>());
-                
-                foreach (var app in apps)
-                {
-                    var summPathLength = app.Path.Count;
-                    for (var i = 0; i < splitedGris[sg].Count; ++i)
-                    {
-                        if (i==r) continue;
-                        var currRobot = splitedGris[sg][i];
-                        var path = new Dictionary<Tuple<int, int>, IList<char>>();
-                        BuildPath(currRobot.Y, currRobot.X, currRobot.Direction, sg, path);
-                        var pathLength = GetPathCount(path);
-                        summPathLength += pathLength;
-                    }
+            //var startRobot = splitedGris[sg][0];
+            //var apps = GetAllPossiblePathes(_tuples[startRobot.Y][startRobot.X], startRobot.Direction, sg, new List<Step>());
+            var mapsDictionary = new Dictionary<char[][], int>() { { sg, 0 } };
+            var prevRobotsSteps = new Dictionary<char[][], IList<Step>>() {{sg, new List<Step>()}};
+            var bmd = BuildBestMap(splitedGris[sg], 0, mapsDictionary, prevRobotsSteps);
+            
+            var bestMap = bmd.Keys.OrderByDescending(k => bmd[k]).FirstOrDefault();
 
-                    if (summPathLength > maxLength)
-                    {
-                        maxLength = summPathLength;
-                        maxLengthApp = app;
-                    }
-                }
-            }
-            
-            
-            if (maxLengthApp == null) continue;
-            
-            var map = maxLengthApp.Map;
-            for (int i = 0; i < map.Length; i++)
+            if (bestMap == null) continue;
+            for (int i = 0; i < bestMap.Length; i++)
             {
-                for (int j = 0; j < map[i].Length; j++)
+                for (int j = 0; j < bestMap[i].Length; j++)
                 {
-                    if (map[i][j] != sg[i][j])
+                    if (bestMap[i][j] != sg[i][j])
                     {
-                        res += j + " " + i + " " + map[i][j] + " ";
+                        res += j + " " + i + " " + bestMap[i][j] + " ";
                     }
                 }
             }
@@ -352,7 +378,6 @@ class Player
 
         if (res.Length > 0) res.Remove(res.Length - 1);
         Console.WriteLine(res);
-
     }
 }
 
